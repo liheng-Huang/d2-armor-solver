@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>命运2 T5配装求解器</title>
+<style>
+  :root {
+    --bg: #0f1117; --card: #1a1d28; --border: #2a2d3a;
+    --text: #d4d4d8; --text-dim: #8888a0; --accent: #f4b53d;
+    --health: #d94a4a; --melee: #4a9ed9; --grenade: #4ad98b;
+    --super: #f4d03f; --class: #b04ad9; --weapons: #d97a3e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5;
+  }
+  .container { max-width: 1000px; margin: 0 auto; padding: 20px; }
+  .header { text-align: center; padding: 30px 20px 10px; }
+  .header h1 { font-size: 26px; color: #fff; }
+  .header h1 span { color: var(--accent); }
+  .header .subtitle { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px; margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 15px; color: var(--text-dim); margin-bottom: 18px;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .input-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+  }
+  @media (max-width: 600px) { .input-grid { grid-template-columns: repeat(2, 1fr); } }
+  .input-group { display: flex; flex-direction: column; gap: 4px; }
+  .input-group label { font-size: 12px; color: var(--text-dim); font-weight: 500; }
+  .input-group input {
+    padding: 9px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg); color: #fff; font-size: 16px; font-family: inherit;
+    width: 100%; transition: border-color 0.15s; text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .input-group input:focus { border-color: var(--accent); outline: none; }
+  .mod-row {
+    display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+    margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+  }
+  .mod-row .input-group { max-width: 100px; }
+  .mod-row .budget-info { font-size: 13px; color: var(--text-dim); }
+  .mod-row .budget-info strong { color: #fff; }
+  .btn-row { text-align: center; margin-bottom: 20px; }
+  .btn-solve {
+    padding: 14px 48px; border-radius: 8px; border: none;
+    background: var(--accent); color: #000; cursor: pointer;
+    font-size: 17px; font-weight: 700; font-family: inherit;
+    transition: all 0.15s; letter-spacing: 0.5px;
+  }
+  .btn-solve:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-solve:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .results { display: none; }
+  .results.show { display: block; }
+  .comparison {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;
+  }
+  @media (max-width: 600px) { .comparison { grid-template-columns: repeat(2, 1fr); } }
+  .comp-item {
+    text-align: center; padding: 14px 10px; border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+  }
+  .comp-item .stat-label { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .comp-item .stat-values { font-size: 20px; font-weight: 700; }
+  .comp-item .diff { font-size: 12px; margin-top: 2px; }
+  .diff.good { color: #4ad98b; }
+  .diff.bad { color: #ff6b6b; }
+  .diff.ok { color: var(--accent); }
+  .piece-result {
+    background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; margin-bottom: 10px;
+  }
+  .piece-result .piece-name {
+    font-weight: 700; font-size: 14px; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .piece-result .piece-name .emoji { font-size: 20px; }
+  .piece-result .detail-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 6px; font-size: 13px;
+  }
+  .piece-result .detail-grid .detail-label { color: var(--text-dim); }
+  .piece-result .detail-grid .detail-value { font-weight: 600; }
+  .piece-result .piece-stats-row {
+    margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px;
+  }
+  .piece-result .piece-stats-row span {
+    padding: 3px 8px; border-radius: 10px; font-weight: 500;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .msg { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+  .msg.error { background: rgba(217,74,74,0.15); border: 1px solid rgba(217,74,74,0.3); color: #ff8888; }
+  .msg.warn { background: rgba(244,181,61,0.1); border: 1px solid rgba(244,181,61,0.25); color: #ffd866; }
+  .msg.info { background: rgba(74,217,139,0.1); border: 1px solid rgba(74,217,139,0.2); color: #66dd99; }
+  .loading { text-align: center; padding: 20px; display: none; }
+  .loading.show { display: block; }
+  .spinner {
+    display: inline-block; width: 32px; height: 32px;
+    border: 3px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .footer { text-align: center; padding: 20px; color: var(--text-dim); font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>命运2 <span>T5</span> 配装求解器</h1>
+    <p class="subtitle">输入目标属性 → 自动计算5件装备最佳配置 · 12种机灵模组 · 调谐自动优化</p>
+  </div>
+
+  <!-- Program Introduction -->
+  <div class="card" style="padding:16px 24px;">
+    <details open>
+      <summary style="cursor:pointer;font-weight:700;font-size:14px;color:var(--accent);">📖 程序介绍（点击收起）</summary>
+      <div style="margin-top:12px;font-size:13px;color:var(--text-dim);line-height:1.8;">
+        <p>本工具用于<strong style="color:#fff;">命运2 最终版本</strong>（马拉松还我命运2）的<strong style="color:#fff;">T5护甲配装属性预览与求解</strong>。</p>
+        <p><strong>核心功能：</strong></p>
+        <ul style="margin:4px 0;padding-left:20px;">
+          <li>输入你期望的六维属性（生命/力量/手雷/超能/职业/武器），以及可用的+5/+10模组数量、星相碎片属性变化</li>
+          <li>程序自动计算5件T5装备分别应使用哪种<strong>机灵护甲商模组</strong>（共12种）、第三属性选什么、调谐槽怎么分配、护甲模组怎么插</li>
+          <li>若目标无法精确达成，可通过<strong>优先属性调整</strong>勾选必须达成的属性，程序会重新优化并展示代价</li>
+          <li>支持<strong>多方案切换</strong>，自动按"易刷程度"排序（4+1 > 3+2 > 2+2+1……），并提供<strong>金装推荐</strong></li>
+        </ul>
+        <p><strong>使用步骤：</strong></p>
+        <ol style="margin:4px 0;padding-left:20px;">
+          <li>填写目标六维数值（考虑碎片加成后的最终值）</li>
+          <li>设置可用的+5和+10模组数量（总共最多5个）</li>
+          <li>填入星相碎片带来的属性增减</li>
+          <li>点击「求解最佳配装」，查看结果</li>
+          <li>如不满意，使用优先属性调整或切换其他方案</li>
+        </ol>
+        <p style="font-size:11px;color:var(--text-dim);margin-top:8px;">
+          ⚙️ 技术说明：每件T5装备基础属性为30+25+20+5+5+5=90点（含大师之作），5件共450点。调谐槽固定为±5转移。模组+5(1费)/+10(3费)。属性上限200点。
+        </p>
+      </div>
+    </details>
+  </div>
+
+  <div class="card" id="inputCard">
+    <h2>🎯 目标六维属性</h2>
+    <div class="input-grid" id="targetGrid"></div>
+    <div class="mod-row">
+      <div class="input-group">
+        <label>+5模组数量</label>
+        <input type="number" id="numPlus5" value="0" min="0" max="5" onchange="updateBudget()">
+      </div>
+      <div class="input-group">
+        <label>+10模组数量</label>
+        <input type="number" id="numPlus10" value="0" min="0" max="5" onchange="updateBudget()">
+      </div>
+      <div class="budget-info">
+        属性总预算: <strong id="budgetDisplay">450</strong> (基础450 + 模组0)
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>✨ 星相碎片属性变化</h2>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:14px;">正值=增加，负值=减少。所有碎片变化汇总后输入。</p>
+    <div class="input-grid" id="fragmentGrid"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-solve" id="btnSolve" onclick="solve()">⚡ 求解最佳配装</button>
+  </div>
+
+  <div id="messages"></div>
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p style="margin-top:10px;color:var(--text-dim);">正在计算最优配装...</p>
+  </div>
+
+  <div class="results" id="results">
+    <div class="card" id="solutionNav" style="display:none;padding:12px 24px;margin-bottom:0;border-bottom:none;border-radius:12px 12px 0 0;"></div>
+    <div class="card" style="border-radius:0 0 12px 12px;">
+      <h2>📊 目标 vs 实际 对比</h2>
+      <div class="comparison" id="comparisonGrid"></div>
+      <div style="text-align:center;margin-top:12px;font-size:13px;color:var(--text-dim);" id="scoreDisplay"></div>
+    </div>
+
+    <!-- Priority Refinement (shown when solve is not perfect) -->
+    <div class="card" id="refineCard" style="display:none;">
+      <h2>🎯 优先属性与约束调整</h2>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">
+        选择优化目标后点击下方按钮重新求解。约束条件对求解器施加硬性限制。
+      </p>
+      <div id="refineCheckboxes"></div>
+      <button class="btn-solve" onclick="refineWithPriorities()" style="font-size:14px;padding:10px 32px;margin-top:12px;">
+        🔄 重新优化
+      </button>
+      <div id="refineCost" style="margin-top:14px;font-size:13px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>🛡️ 推荐配装方案</h2>
+      <div id="piecesOutput"></div>
+    </div>
+
+    <div class="card" id="exoticCard" style="display:none;">
+      <h2>⭐ 金装推荐</h2>
+      <p style="font-size:12px;color:var(--text-dim);margin-bottom:14px;">
+        金装的调谐槽位是任意可选的（不像紫装随机），建议把<strong>数量最少</strong>的原型放在金装上，<br>
+        这样其余紫装可以统一使用同一个机灵模组刷取。
+      </p>
+      <div id="exoticRecommendation"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    命运2 T5配装求解器 · 最终版本（马拉松还我命运2）<br>
+    B站UID: 57597346 &nbsp;|&nbsp; QQ群: 1050912445
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const STATS = ['health', 'melee', 'grenade', 'super', 'class', 'weapons'];
+const STAT_LABELS = { health:'生命', melee:'力量', grenade:'手雷', super:'超能', class:'职业', weapons:'武器' };
+const STAT_COLORS = { health:'#d94a4a', melee:'#4a9ed9', grenade:'#4ad98b', super:'#f4d03f', class:'#b04ad9', weapons:'#d97a3e' };
+const PIECE_NAMES = ['装备 1', '装备 2', '装备 3', '装备 4', '装备 5'];
+const PIECE_EMOJI = ['①', '②', '③', '④', '⑤'];
+
+const ARCHETYPES = [
+  { name:'突围者 Siegebreaker', primary:'health', secondary:'grenade' },
+  { name:'壁垒 Bulwark', primary:'health', secondary:'class' },
+  { name:'搏击手 Brawler', primary:'melee', secondary:'health' },
+  { name:'突击手 Skirmisher', primary:'melee', secondary:'weapons' },
+  { name:'掷雷手 Grenadier', primary:'grenade', secondary:'super' },
+  { name:'爆破专家 Demolitionist', primary:'grenade', secondary:'class' },
+  { name:'装甲兵 Colossus', primary:'super', secondary:'health' },
+  { name:'楷模典范 Paragon', primary:'super', secondary:'melee' },
+  { name:'掠夺者 Reaver', primary:'class', secondary:'melee' },
+  { name:'专家 Specialist', primary:'class', secondary:'weapons' },
+  { name:'枪手 Gunner', primary:'weapons', secondary:'grenade' },
+  { name:'高能者 Powerhouse', primary:'weapons', secondary:'super' },
+];
+
+// ============================================================
+// PRECOMPUTE BASE CONFIGS (archetype + tertiary, NO tuning)
+// Tuning is assigned deterministically during evaluation
+// ============================================================
+const BASE_CONFIGS = [];
+
+(function precompute() {
+  for (const arch of ARCHETYPES) {
+    const availTert = STATS.filter(s => s !== arch.primary && s !== arch.secondary);
+    for (const tertiary of availTert) {
+      const stats = {};
+      for (const s of STATS) stats[s] = 0;
+      stats[arch.primary] = 30;
+      stats[arch.secondary] = 25;
+      stats[tertiary] = 20;
+      const mwSet = new Set([arch.primary, arch.secondary, tertiary]);
+      for (const s of STATS) {
+        if (!mwSet.has(s)) stats[s] = 5;
+      }
+      BASE_CONFIGS.push({
+        archetype: arch.name,
+        primary: arch.primary,
+        secondary: arch.secondary,
+        tertiary: tertiary,
+        baseStats: stats,
+      });
+    }
+  }
+})();
+// 12 archetypes × 4 tertiary = 48 base configs
+
+// ============================================================
+// EVALUATION: compute deterministic tuning + mods for a config
+// ============================================================
+
+function evaluateConfig(baseConfigs, target, numPlus5, numPlus10, constraints) {
+  // Step 1: Sum base stats (without tuning)
+  const totals = {};
+  for (const s of STATS) totals[s] = 0;
+  for (let i = 0; i < 5; i++) {
+    for (const s of STATS) totals[s] += baseConfigs[i].baseStats[s];
+  }
+
+  // Step 2: Assign tuning
+  // Priority: (a) user-prioritized stats that are under target need +5,
+  //          (b) zero-target stats NEED -5 to reach 0,
+  //          (c) then normal heuristic
+  const tuningAssignments = [];
+
+  // Pre-calculate required -5 hits for zero-target and priority stats
+  const forcedFromHits = {}; // stat -> remaining required -5 hits
+  for (const s of STATS) {
+    if (target[s] === 0 && totals[s] > 0) {
+      forcedFromHits[s] = Math.min(5, Math.ceil(totals[s] / 5));
+    }
+  }
+  const hitsRemaining = { ...forcedFromHits };
+
+  for (let i = 0; i < 5; i++) {
+    const gaps = {};
+    for (const s of STATS) gaps[s] = totals[s] - target[s];
+
+    let fromStat, toStat;
+
+    // --- Choose -5 source ---
+    fromStat = null;
+
+    // 1) Zero-target stats that still need -5 hits
+    for (const s of STATS) {
+      if (hitsRemaining[s] > 0 && gaps[s] > 0) {
+        fromStat = s;
+        hitsRemaining[s]--;
+        break;
+      }
+    }
+
+    // 2) Non-priority stats with excess (avoid taking -5 from priority stats)
+    if (fromStat === null) {
+      let bestExcess = -Infinity;
+      fromStat = STATS[0];
+      for (const s of STATS) {
+        const excess = gaps[s];
+        const isPriority = constraints?.priorities && constraints.priorities[s];
+        // Penalize taking -5 from priority stats
+        const adjustedExcess = isPriority ? excess - 999 : excess;
+        if (adjustedExcess > bestExcess ||
+            (Math.abs(adjustedExcess - bestExcess) < 0.001 && target[s] < target[fromStat])) {
+          bestExcess = adjustedExcess;
+          fromStat = s;
+        }
+      }
+    }
+
+    // --- Choose +5 target ---
+    let bestDeficit = Infinity;
+    toStat = null;
+    for (const s of STATS) {
+      if (s === fromStat) continue;
+      const deficit = gaps[s];
+      const isPriority = constraints?.priorities && constraints.priorities[s];
+      // Bonus for priority stats: make them look more in deficit
+      const adjustedDeficit = isPriority ? deficit - 999 : deficit;
+      if (toStat === null || adjustedDeficit < bestDeficit ||
+          (Math.abs(adjustedDeficit - bestDeficit) < 0.001 &&
+           (constraints?.priorities && constraints.priorities[s] && !constraints.priorities[toStat]))) {
+        bestDeficit = adjustedDeficit;
+        toStat = s;
+      }
+    }
+    if (toStat === null) toStat = STATS.find(s => s !== fromStat);
+
+    tuningAssignments.push({ from: fromStat, to: toStat });
+    totals[fromStat] -= 5;
+    totals[toStat] += 5;
+  }
+
+  // Step 3: Distribute mods greedily (priority stats first)
+  const modSizes = [];
+  for (let i = 0; i < numPlus10; i++) modSizes.push(10);
+  for (let i = 0; i < numPlus5; i++) modSizes.push(5);
+  modSizes.sort((a, b) => b - a);
+
+  const modAssignments = {};
+  const usedPieces = new Set();
+
+  for (const modSize of modSizes) {
+    let bestStat = null;
+    let bestPiece = null;
+    let bestImprovement = -Infinity;
+
+    for (const st of STATS) {
+      const p = constraints?.priorities || {};
+      const l100 = constraints?.le100 || {};
+      const g0 = constraints?.force0 || {};
+      const oldPenalty = singlePenalty(totals[st], target[st], p[st], l100[st], g0[st]);
+      const newPenalty = singlePenalty(totals[st] + modSize, target[st], p[st], l100[st], g0[st]);
+      const improvement = oldPenalty - newPenalty;
+
+      if (improvement > bestImprovement) {
+        for (let p = 0; p < 5; p++) {
+          if (!usedPieces.has(p)) {
+            bestImprovement = improvement;
+            bestStat = st;
+            bestPiece = p;
+            break;
+          }
+        }
+      }
+    }
+
+    if (bestPiece !== null && bestStat !== null) {
+      modAssignments[bestPiece] = { stat: bestStat, size: modSize };
+      usedPieces.add(bestPiece);
+      totals[bestStat] += modSize;
+    }
+  }
+
+  for (let p = 0; p < 5; p++) {
+    if (!modAssignments[p]) modAssignments[p] = null;
+  }
+
+  const finalScore = scoreStats(totals, target, constraints);
+  return { totals, tuningAssignments, modAssignments, score: finalScore };
+}
+
+function singlePenalty(actual, target, isPriority, le100, force0) {
+  const diff = actual - target;
+  let penalty = diff < 0 ? diff * diff * 3 : diff * diff;
+  if (isPriority) penalty *= 50;
+  // Hard constraints
+  if (le100 && actual > 100) penalty += (actual - 100) * (actual - 100) * 500;
+  if (force0 && actual > 0) penalty += actual * actual * 500;
+  return penalty;
+}
+
+function scoreStats(actual, target, constraints) {
+  let s = 0;
+  const p = constraints?.priorities || {};
+  const l100 = constraints?.le100 || {};
+  const f0 = constraints?.force0 || {};
+  for (const st of STATS) {
+    s += singlePenalty(actual[st], target[st], p[st], l100[st], f0[st]);
+  }
+  return s;
+}
+
+// ============================================================
+// GLOBAL STATE (for refinement)
+// ============================================================
+let lastTargets = null;
+let lastFragments = null;
+let lastNumPlus5 = 0;
+let lastNumPlus10 = 0;
+let allSolutions = [];       // All unique solutions found
+let currentSolutionIdx = 0;  // Currently displayed solution index
+let lastPriorities = null;
+
+// ============================================================
+// SOLUTION FARMABILITY SCORING
+// ============================================================
+
+// Get archetype multiset key for dedup (e.g., "壁垒×3,搏击手×2")
+function archetypeKey(config) {
+  const freq = {};
+  for (let i = 0; i < 5; i++) {
+    const name = config[i].archetype;
+    freq[name] = (freq[name] || 0) + 1;
+  }
+  return Object.entries(freq)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([n, c]) => n + '×' + c).join(',');
+}
+
+// Farmability score: lower = easier to farm
+// Fewer distinct archetypes = better; 4-1 > 3-2 > 3-1-1 > 2-2-1 > ...
+function farmabilityScore(config) {
+  const freq = {};
+  for (let i = 0; i < 5; i++) {
+    const name = config[i].archetype;
+    freq[name] = (freq[name] || 0) + 1;
+  }
+  const counts = Object.values(freq).sort((a, b) => b - a);
+  const distinct = counts.length;           // Primary: fewer types
+  const maxCount = counts[0];               // Secondary: more concentrated
+  // Scoring: distinct has higher weight
+  return distinct * 100 - maxCount;
+  // 4-1: 2*100-4=196, 3-2: 2*100-3=197, 5-0: 1*100-5=95 (best)
+  // 3-1-1: 3*100-3=297, 2-2-1: 3*100-2=298, 2-1-1-1: 4*100-2=398
+  // 1-1-1-1-1: 5*100-1=499 (worst)
+}
+
+// ============================================================
+// SOLVER
+// ============================================================
+
+function runSolver(target, numPlus5, numPlus10, constraints) {
+  // Collect unique solutions: key -> {config, result}
+  const solutionMap = new Map();
+
+  const NUM_RESTARTS = 400; // Increased to find more unique solutions
+
+  for (let restart = 0; restart < NUM_RESTARTS; restart++) {
+    let config = [];
+    for (let i = 0; i < 5; i++) {
+      config.push(BASE_CONFIGS[Math.floor(Math.random() * BASE_CONFIGS.length)]);
+    }
+
+    let result = evaluateConfig(config, target, numPlus5, numPlus10, constraints);
+    let currentScore = result.score;
+
+    // Hill climbing
+    let improved = true;
+    let iter = 0;
+    const MAX_ITER = 30;
+
+    while (improved && iter < MAX_ITER) {
+      improved = false;
+      iter++;
+
+      for (let pos = 0; pos < 5; pos++) {
+        let foundBetter = false;
+        const order = shuffle([...Array(BASE_CONFIGS.length).keys()]);
+
+        for (const altIdx of order) {
+          if (BASE_CONFIGS[altIdx] === config[pos]) continue;
+          const newConfig = [...config];
+          newConfig[pos] = BASE_CONFIGS[altIdx];
+          const newResult = evaluateConfig(newConfig, target, numPlus5, numPlus10, constraints);
+
+          if (newResult.score < currentScore) {
+            config = newConfig;
+            currentScore = newResult.score;
+            result = newResult;
+            improved = true;
+            foundBetter = true;
+            break;
+          }
+        }
+
+        if (foundBetter) break;
+      }
+    }
+
+    // Store this converged solution (dedup by archetype multiset)
+    const key = archetypeKey(config);
+    const existing = solutionMap.get(key);
+    if (!existing || currentScore < existing.score) {
+      solutionMap.set(key, {
+        config: [...config],
+        tuningAssignments: result.tuningAssignments,
+        modAssignments: result.modAssignments,
+        totals: result.totals,
+        score: currentScore,
+      });
+    }
+  }
+
+  // Sort solutions: first by score tier, then by farmability within same tier
+  const solutions = [...solutionMap.values()];
+  solutions.sort((a, b) => {
+    const aTier = Math.floor(a.score / 100);
+    const bTier = Math.floor(b.score / 100);
+    if (aTier !== bTier) return a.score - b.score;
+
+    const aFarm = farmabilityScore(a.config);
+    const bFarm = farmabilityScore(b.config);
+    if (aFarm !== bFarm) return aFarm - bFarm;
+
+    return a.score - b.score;
+  });
+
+  // Cap to top 20 solutions to keep UI manageable
+  return solutions.slice(0, 20);
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+
+function getStatInputHTML(prefix, stat, val) {
+  return `
+    <div class="input-group">
+      <label style="color:${STAT_COLORS[stat]}">${STAT_LABELS[stat]}</label>
+      <input type="number" id="${prefix}_${stat}" value="${val||0}"
+        style="border-color:${(val||0)!==0?STAT_COLORS[stat]:'var(--border)'}">
+    </div>`;
+}
+
+function renderInputs() {
+  const targetGrid = document.getElementById('targetGrid');
+  targetGrid.innerHTML = STATS.map(s => getStatInputHTML('target', s, 100)).join('');
+  const fragGrid = document.getElementById('fragmentGrid');
+  fragGrid.innerHTML = STATS.map(s => getStatInputHTML('frag', s, 0)).join('');
+  updateBudget();
+}
+
+function getVal(id) { return parseInt(document.getElementById(id)?.value) || 0; }
+
+function updateBudget() {
+  const n5 = getVal('numPlus5');
+  const n10 = getVal('numPlus10');
+  const budget = 450 + n5 * 5 + n10 * 10;
+  document.getElementById('budgetDisplay').textContent = budget;
+}
+
+function getFragments() {
+  const f = {};
+  for (const s of STATS) f[s] = getVal('frag_' + s);
+  return f;
+}
+
+// ============================================================
+// SOLVE
+// ============================================================
+
+function solve() {
+  const msgs = document.getElementById('messages');
+  const results = document.getElementById('results');
+  const loading = document.getElementById('loading');
+  msgs.innerHTML = '';
+  results.classList.remove('show');
+  document.getElementById('refineCard').style.display = 'none';
+
+  const targets = {};
+  for (const s of STATS) targets[s] = getVal('target_' + s);
+  const fragments = getFragments();
+  let numPlus5 = getVal('numPlus5');
+  let numPlus10 = getVal('numPlus10');
+
+  // Store for refinement
+  lastTargets = targets;
+  lastFragments = fragments;
+  lastNumPlus5 = numPlus5;
+  lastNumPlus10 = numPlus10;
+  lastResult = null;
+
+  // Validation: mod count
+  if (numPlus5 + numPlus10 > 5) {
+    const excess = numPlus5 + numPlus10 - 5;
+    numPlus5 = Math.max(0, numPlus5 - excess);
+    if (numPlus5 + numPlus10 > 5) numPlus10 = 5 - numPlus5;
+    document.getElementById('numPlus5').value = numPlus5;
+    document.getElementById('numPlus10').value = numPlus10;
+    updateBudget();
+    msgs.innerHTML += `<div class="msg warn">⚠️ 模组总数超过5个，已自动调整为${numPlus5}个+5 + ${numPlus10}个+10</div>`;
+  }
+
+  // Compute adjusted target (armor must provide this)
+  const adjTarget = {};
+  let adjSum = 0;
+  for (const s of STATS) {
+    adjTarget[s] = targets[s] - (fragments[s] || 0);
+    adjSum += adjTarget[s];
+  }
+
+  const totalBudget = 450 + numPlus5 * 5 + numPlus10 * 10;
+  const fragSumVal = Object.values(fragments).reduce((a,b)=>a+b,0);
+
+  // Validation: total sum
+  const diff = adjSum - totalBudget;
+  if (diff > 0) {
+    msgs.innerHTML += `<div class="msg error">
+      ⚠️ <strong>目标总和超出预算</strong><br>
+      护甲需提供 <strong>${adjSum}</strong> 点 (目标${Object.values(targets).reduce((a,b)=>a+b,0)} - 碎片${fragSumVal})，
+      但护甲上限为 <strong>${totalBudget}</strong> 点 (基础450 + 模组${numPlus5*5+numPlus10*10})<br>
+      超出 <strong>${diff}</strong> 点。请降低目标或增加模组。
+    </div>`;
+    return;
+  } else if (diff < 0) {
+    msgs.innerHTML += `<div class="msg warn">
+      💡 <strong>目标总和低于护甲产出</strong><br>
+      护甲固定产出 <strong>${totalBudget}</strong> 点，但目标仅需 <strong>${adjSum}</strong> 点。
+      多出 <strong>${-diff}</strong> 点将不可避免分配到某些属性上。
+    </div>`;
+  }
+
+  // Run solver
+  loading.classList.add('show');
+  document.getElementById('btnSolve').disabled = true;
+
+  setTimeout(() => {
+    allSolutions = runSolver(adjTarget, numPlus5, numPlus10, null);
+    lastPriorities = null;
+    currentSolutionIdx = 0;
+
+    loading.classList.remove('show');
+    document.getElementById('btnSolve').disabled = false;
+
+    const bestResult = allSolutions[0];
+
+    // Post-solve analysis
+    if (bestResult.score === 0) {
+      msgs.innerHTML += `<div class="msg info">✅ 找到完美匹配的配装方案！（共${allSolutions.length}个不同方案）</div>`;
+    } else if (bestResult.score < 100) {
+      msgs.innerHTML += `<div class="msg info">✅ 找到接近完美的配装方案（共${allSolutions.length}个不同方案，按易刷程度排序）</div>`;
+    } else {
+      msgs.innerHTML += `<div class="msg warn">
+        ⚠️ 最优解与目标有偏差（共${allSolutions.length}个不同方案）。目标在当前约束下可能无法精确达成。
+      </div>`;
+    }
+
+    displayAllResults(bestResult, targets, fragments);
+  }, 30);
+}
+
+// ============================================================
+// DISPLAY RESULTS
+// ============================================================
+
+function switchSolution(idx) {
+  if (idx < 0 || idx >= allSolutions.length) return;
+  currentSolutionIdx = idx;
+  displayAllResults(allSolutions[idx], lastTargets, lastFragments);
+}
+
+function buildRefineCard(targets, finalTotals) {
+  // Grid: [stat name, 精确达成, ≤100, 强制为0, current diff]
+  let html = '<div style="display:grid;grid-template-columns:auto repeat(3,70px) auto;gap:6px 10px;align-items:center;font-size:13px;">';
+  html += '<div></div><div style="font-size:11px;color:var(--text-dim);text-align:center;">精确达成</div><div style="font-size:11px;color:var(--text-dim);text-align:center;">不超过100</div><div style="font-size:11px;color:var(--text-dim);text-align:center;">强制为0</div><div></div>';
+
+  for (const s of STATS) {
+    const diff = finalTotals[s] - targets[s];
+    const notExact = diff !== 0;
+    const over100 = finalTotals[s] > 100;
+    const notZero = finalTotals[s] !== 0 && targets[s] === 0;
+
+    html += `
+      <div style="color:${STAT_COLORS[s]};font-weight:600;">${STAT_LABELS[s]}</div>
+      <div style="text-align:center;"><input type="checkbox" id="prio_${s}" ${notExact ? '' : 'checked'} style="accent-color:${STAT_COLORS[s]};"></div>
+      <div style="text-align:center;"><input type="checkbox" id="le100_${s}" ${over100 ? 'checked' : ''} style="accent-color:var(--accent);"></div>
+      <div style="text-align:center;"><input type="checkbox" id="force0_${s}" ${notZero ? 'checked' : (targets[s]===0?'checked':'')} style="accent-color:var(--accent);"></div>
+      <div style="font-size:11px;color:${notExact?'var(--text-dim)':'#4ad98b'};">${notExact ? '差'+(diff>0?'+':'')+diff : '✓'}</div>`;
+  }
+  html += '</div>';
+  document.getElementById('refineCheckboxes').innerHTML = html;
+  document.getElementById('refineCost').innerHTML = '';
+}
+
+function readConstraints() {
+  const priorities = {};
+  const le100 = {};   // must be ≤ 100
+  const force0 = {};  // must be exactly 0
+  for (const s of STATS) {
+    priorities[s] = document.getElementById('prio_' + s)?.checked || false;
+    le100[s] = document.getElementById('le100_' + s)?.checked || false;
+    force0[s] = document.getElementById('force0_' + s)?.checked || false;
+  }
+  return { priorities, le100, force0 };
+}
+
+function refineWithPriorities() {
+  if (!lastTargets || allSolutions.length === 0) return;
+
+  const constraints = readConstraints();
+  const hasConstraint = Object.values(constraints.priorities).some(v=>v) ||
+                        Object.values(constraints.le100).some(v=>v) ||
+                        Object.values(constraints.force0).some(v=>v);
+  if (!hasConstraint) {
+    alert('请至少选择一个优化目标或约束条件。');
+    return;
+  }
+
+  // Re-compute adjusted target
+  const adjTarget = {};
+  for (const s of STATS) adjTarget[s] = lastTargets[s] - (lastFragments[s] || 0);
+
+  // Show loading
+  document.getElementById('loading').classList.add('show');
+
+  setTimeout(() => {
+    const newSolutions = runSolver(adjTarget, lastNumPlus5, lastNumPlus10, constraints);
+    const newResult = newSolutions[0];
+
+    document.getElementById('loading').classList.remove('show');
+
+    // Store new solutions
+    const prevResult = allSolutions[currentSolutionIdx];
+    allSolutions = newSolutions;
+    lastPriorities = constraints;
+    currentSolutionIdx = 0;
+
+    // Update comparison grid with before/after
+    const newFinal = { ...newResult.totals };
+    for (const s of STATS) newFinal[s] += (lastFragments[s] || 0);
+    const oldFinal = { ...prevResult.totals };
+    for (const s of STATS) oldFinal[s] += (lastFragments[s] || 0);
+
+    const compGrid = document.getElementById('comparisonGrid');
+    let compHTML = '';
+    for (const st of STATS) {
+      const target = lastTargets[st];
+      const actual = newFinal[st];
+      const oldActual = oldFinal[st];
+      const diff = actual - target;
+      const oldDiff = oldActual - target;
+      const isPriority = constraints.priorities[st];
+
+      let diffClass = diff === 0 ? 'good' : (diff > 0 ? 'ok' : 'bad');
+      let diffText = diff === 0 ? '✓ 精确' : (diff > 0 ? `+${diff}` : `${diff}`);
+      let priorityBadge = isPriority ? '⭐' : '';
+
+      compHTML += `
+        <div class="comp-item" style="${isPriority ? 'border:2px solid var(--accent);' : ''}">
+          <div class="stat-label" style="color:${STAT_COLORS[st]}">${priorityBadge} ${STAT_LABELS[st]} ${isPriority ? '(优先)' : ''}</div>
+          <div class="stat-values">
+            <span style="color:${STAT_COLORS[st]}">${actual}</span>
+            <span style="color:var(--text-dim);font-size:14px;"> / ${target}</span>
+          </div>
+          <div class="diff ${diffClass}">${diffText}</div>
+          ${oldDiff !== diff ? `<div style="font-size:10px;color:var(--text-dim);">上轮: ${oldActual} (${oldDiff>=0?'+':''}${oldDiff})</div>` : ''}
+        </div>`;
+    }
+    compGrid.innerHTML = compHTML;
+
+    document.getElementById('scoreDisplay').innerHTML =
+      `得分: <strong>${newResult.score.toFixed(0)}</strong> (0=完美) | 总属性: <strong>${Object.values(newFinal).reduce((a,b)=>a+b,0)}</strong>`;
+
+    // Cost analysis
+    const costLines = [];
+    for (const st of STATS) {
+      const oldD = oldFinal[st] - lastTargets[st];
+      const newD = newFinal[st] - lastTargets[st];
+      if (constraints.priorities[st]) {
+        if (newD === 0) costLines.push(`<span style="color:#4ad98b;">✅ ${STAT_LABELS[st]}: 精确达成目标 (${lastTargets[st]})</span>`);
+        else costLines.push(`<span style="color:var(--accent);">⚠️ ${STAT_LABELS[st]}: 差${newD>0?'+':''}${newD} (无法完全达成)</span>`);
+      } else if (Math.abs(newD) > Math.abs(oldD)) {
+        costLines.push(`<span style="color:#ff6b6b;">📉 ${STAT_LABELS[st]}: ${newD>0?'+':''}${newD} (比之前更差，为优先属性让步)</span>`);
+      } else if (Math.abs(newD) < Math.abs(oldD)) {
+        costLines.push(`<span style="color:#4ad98b;">📈 ${STAT_LABELS[st]}: ${newD>0?'+':''}${newD} (附带改善)</span>`);
+      }
+    }
+
+    document.getElementById('refineCost').innerHTML = `
+      <div style="border-top:1px solid var(--border);padding-top:12px;">
+        <strong>代价分析：</strong><br>
+        ${costLines.length > 0 ? costLines.join('<br>') : '所有属性均无显著变化。'}
+      </div>`;
+
+    // Update nav bar
+    const navBar = document.getElementById('solutionNav');
+    if (allSolutions.length > 1) {
+      navBar.style.display = 'block';
+      let navHTML = `<div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">📋 ${allSolutions.length} 种方案（点击切换）：</div>`;
+      navHTML += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+      for (let si = 0; si < allSolutions.length; si++) {
+        const sol = allSolutions[si];
+        const key = archetypeKey(sol.config);
+        navHTML += `<button onclick="switchSolution(${si})"
+          style="padding:6px 10px;border-radius:6px;border:1px solid ${si===0?'var(--accent)':'var(--border)'};background:${si===0?'rgba(244,181,61,0.12)':'var(--bg)'};color:${si===0?'#fff':'var(--text)'};cursor:pointer;font-size:12px;font-family:inherit;">
+          ${si===0?'<b>#'+(si+1)+'</b>':'#'+(si+1)} ${key}
+        </button>`;
+      }
+      navHTML += '</div>';
+      navBar.innerHTML = navHTML;
+    }
+
+    // Update pieces output
+    displayPieceResults(newResult, lastFragments);
+
+    // Re-populate checkboxes
+    buildRefineCard(lastTargets, newFinal);
+  }, 30);
+}
+
+function generateExoticRecommendation(config) {
+  // Count archetype frequencies
+  const freq = {};
+  for (let i = 0; i < 5; i++) {
+    const name = config[i].archetype;
+    freq[name] = (freq[name] || 0) + 1;
+  }
+
+  // Sort by frequency: least common first (best exotic candidate)
+  const entries = Object.entries(freq).sort((a, b) => a[1] - b[1]);
+  const mostCommon = entries[entries.length - 1]; // most frequent
+
+  // Strategy: recommend the least common archetype as exotic
+  // The most common archetype can be farmed with one ghost mod for remaining legendaries
+  let html = '<div style="display:grid;gap:8px;">';
+
+  // Summary
+  const allSame = entries.length === 1;
+  const perfectSplit = entries.length === 2 && entries[0][1] === 1 && entries[1][1] === 4;
+
+  if (allSame) {
+    html += `<p style="color:#4ad98b;">✅ 5件全部同一原型（${entries[0][0]}），任意一件做金装均可，其余4件紫装统一用该机灵模组刷取。</p>`;
+  } else if (perfectSplit) {
+    html += `<p style="color:#4ad98b;">✅ 典型4+1分配：推荐金装选 <strong>${entries[0][0]}</strong>，其余4件紫装统一用 <strong>${entries[1][0]}</strong> 模组刷取。</p>`;
+  } else {
+    // General case: recommend the least common as exotic
+    const exoticCandidates = entries.filter(e => e[1] === entries[0][1]);
+    const exoticNames = exoticCandidates.map(e => e[0]).join(' 或 ');
+    const legendaryArchetypes = entries.filter(e => e[1] > entries[0][1]).map(e => `${e[0]}(×${e[1]})`).join('、');
+    html += `<p>建议金装选: <strong>${exoticNames}</strong>（各${entries[0][1]}件中选1件做金装）<br>
+      其余紫装需要: ${legendaryArchetypes || entries.slice(1).map(e => e[0]+'(×'+e[1]+')').join('、')}
+    </p>`;
+  }
+
+  // Detail table
+  html += '<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px;">';
+  html += '<tr style="color:var(--text-dim);"><th style="text-align:left;padding:6px;">机灵模组</th><th style="text-align:center;padding:6px;">数量</th><th style="text-align:left;padding:6px;">推荐用途</th></tr>';
+
+  for (let idx = entries.length - 1; idx >= 0; idx--) {
+    const [name, count] = entries[idx];
+    const isExoticCandidate = count === entries[0][1];
+    const isMostCommon = count === mostCommon[1] && entries.length > 1;
+
+    let usage = '';
+    if (isExoticCandidate && !allSame) {
+      usage = '⭐ 建议选1件做<strong>金装</strong>（调谐自由）';
+      if (count > 1) usage += `（${count}件中任选1件）`;
+    } else if (isMostCommon) {
+      usage = `紫装（插此模组刷${allSame ? '全部5件' : count+'件'}）`;
+    } else {
+      usage = `紫装（需刷${count}件）`;
+    }
+
+    html += `<tr style="border-top:1px solid var(--border);">
+      <td style="padding:6px;color:var(--accent);">${name}</td>
+      <td style="text-align:center;padding:6px;font-weight:700;">${count}件</td>
+      <td style="padding:6px;">${usage}</td>
+    </tr>`;
+  }
+  html += '</table></div>';
+
+  return html;
+}
+
+function displayPieceResults(result, fragments) {
+  const piecesOutput = document.getElementById('piecesOutput');
+  let piecesHTML = '';
+
+  for (let i = 0; i < 5; i++) {
+    const p = result.config[i];
+    const tune = result.tuningAssignments[i];
+    const ma = result.modAssignments[i];
+
+    const pieceStats = { ...p.baseStats };
+    pieceStats[tune.from] -= 5;
+    pieceStats[tune.to] += 5;
+    if (ma) pieceStats[ma.stat] += ma.size;
+
+    piecesHTML += `
+    <div class="piece-result">
+      <div class="piece-name">
+        <span class="emoji">${PIECE_EMOJI[i]}</span> ${PIECE_NAMES[i]}
+      </div>
+      <div class="detail-grid">
+        <div><span class="detail-label">机灵模组:</span> <span class="detail-value" style="color:var(--accent)">${p.archetype}</span></div>
+        <div><span class="detail-label">主属性(30):</span> <span class="detail-value" style="color:${STAT_COLORS[p.primary]}">${STAT_LABELS[p.primary]}</span></div>
+        <div><span class="detail-label">副属性(25):</span> <span class="detail-value" style="color:${STAT_COLORS[p.secondary]}">${STAT_LABELS[p.secondary]}</span></div>
+        <div><span class="detail-label">第三属性(20):</span> <span class="detail-value" style="color:${STAT_COLORS[p.tertiary]}">${STAT_LABELS[p.tertiary]}</span></div>
+        <div><span class="detail-label">调谐 -5:</span> <span class="detail-value" style="color:${STAT_COLORS[tune.from]}">${STAT_LABELS[tune.from]}</span></div>
+        <div><span class="detail-label">调谐 +5:</span> <span class="detail-value" style="color:${STAT_COLORS[tune.to]}">${STAT_LABELS[tune.to]}</span></div>
+        ${ma ? `<div><span class="detail-label">护甲模组:</span> <span class="detail-value" style="color:var(--grenade)">+${ma.size} ${STAT_LABELS[ma.stat]}</span></div>` : '<div><span class="detail-label">护甲模组:</span> <span class="detail-value" style="color:var(--text-dim)">无</span></div>'}
+      </div>
+      <div class="piece-stats-row">
+        ${STATS.map(s => `<span style="color:${STAT_COLORS[s]}">${STAT_LABELS[s]}: ${pieceStats[s]}</span>`).join('')}
+      </div>
+    </div>`;
+  }
+  piecesOutput.innerHTML = piecesHTML;
+
+  // Show exotic recommendation
+  const exoticCard = document.getElementById('exoticCard');
+  const exoticRec = document.getElementById('exoticRecommendation');
+  exoticRec.innerHTML = generateExoticRecommendation(result.config);
+  exoticCard.style.display = 'block';
+}
+
+function displayAllResults(result, targets, fragments) {
+  const results = document.getElementById('results');
+  results.classList.add('show');
+  const finalTotals = { ...result.totals };
+  for (const s of STATS) finalTotals[s] += (fragments[s] || 0);
+
+  // Solution nav bar — show all solutions as clickable list
+  const navBar = document.getElementById('solutionNav');
+  if (allSolutions.length > 1) {
+    navBar.style.display = 'block';
+    let navHTML = '<div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">📋 ${allSolutions.length} 种不同原型组合方案（按易刷程度排序，点击切换）：</div>';
+    navHTML += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+    for (let si = 0; si < allSolutions.length; si++) {
+      const sol = allSolutions[si];
+      const key = archetypeKey(sol.config);
+      const active = si === currentSolutionIdx;
+      navHTML += `<button onclick="switchSolution(${si})"
+        style="padding:6px 10px;border-radius:6px;border:1px solid ${active?'var(--accent)':'var(--border)'};background:${active?'rgba(244,181,61,0.12)':'var(--bg)'};color:${active?'#fff':'var(--text)'};cursor:pointer;font-size:12px;font-family:inherit;transition:all 0.15s;">
+        ${active?'<b>#'+(si+1)+'</b>':'#'+(si+1)} ${key}
+      </button>`;
+    }
+    navHTML += '</div>';
+    navBar.innerHTML = navHTML;
+  } else {
+    navBar.style.display = 'none';
+  }
+
+  // Comparison grid
+  const compGrid = document.getElementById('comparisonGrid');
+  let compHTML = '';
+  for (const st of STATS) {
+    const target = targets[st];
+    const actual = finalTotals[st];
+    const diff = actual - target;
+    let diffClass = diff === 0 ? 'good' : (diff > 0 ? 'ok' : 'bad');
+    let diffText = diff === 0 ? '✓ 精确' : (diff > 0 ? `+${diff}` : `${diff}`);
+
+    compHTML += `
+      <div class="comp-item">
+        <div class="stat-label" style="color:${STAT_COLORS[st]}">${STAT_LABELS[st]}</div>
+        <div class="stat-values">
+          <span style="color:${STAT_COLORS[st]}">${actual}</span>
+          <span style="color:var(--text-dim);font-size:14px;"> / ${target}</span>
+        </div>
+        <div class="diff ${diffClass}">${diffText}</div>
+      </div>`;
+  }
+  compGrid.innerHTML = compHTML;
+
+  document.getElementById('scoreDisplay').innerHTML =
+    `得分: <strong>${result.score.toFixed(0)}</strong> (0=完美) | 总属性: <strong>${Object.values(finalTotals).reduce((a,b)=>a+b,0)}</strong>`;
+
+  // Show refine card
+  const refineCard = document.getElementById('refineCard');
+  refineCard.style.display = 'block';
+  buildRefineCard(targets, finalTotals);
+
+  // Pieces output
+  displayPieceResults(result, fragments);
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderInputs();
+document.getElementById('inputCard').addEventListener('input', updateBudget);
+</script>
+</body>
+</html>
