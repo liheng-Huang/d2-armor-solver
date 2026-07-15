@@ -702,29 +702,34 @@ function updateBudget() {
   const budget = 450 + n3 * 3 + n5 * 5 + n10 * 10;
   document.getElementById('budgetDisplay').textContent = budget;
 
-  // Compute target sum vs budget
-  let targetSum = 0;
-  const targetInputs = document.getElementById('targetGrid').querySelectorAll('input');
-  targetInputs.forEach(inp => { targetSum += parseInt(inp.value) || 0; });
-  const diff = targetSum - budget;
+  // Compute armor needed vs budget (with fragments factored in)
+  let targetSum = 0, armorNeeded = 0;
+  for (const s of STATS) {
+    const t = getVal('target_' + s);
+    const f = getFragVal(s);
+    targetSum += t;
+    let adj = t - f;
+    if (t === 0 || adj < 0) adj = 0;
+    armorNeeded += adj;
+  }
+  const diff = armorNeeded - budget;
   const sumEl = document.getElementById('targetSumDisplay');
   if (targetSum > 0) {
     let html = '';
     if (diff > 0) {
-      html = `<div style="padding:8px 14px;border-radius:8px;background:rgba(255,107,107,0.12);border:1px solid rgba(255,107,107,0.3);font-size:13px;">
-        🔴 目标总和 <strong>${targetSum}</strong>，预算 <strong>${budget}</strong><br>
-        <span style="color:#ff6b6b;font-weight:700;">超出 ${diff} 点</span> — 请降低目标或增加模组数量
-      </div>`;
+      html = '<div style=\"padding:8px 14px;border-radius:8px;background:rgba(255,107,107,0.12);border:1px solid rgba(255,107,107,0.3);font-size:13px;\">' +
+        '🔴 护甲需提供 <strong>' + armorNeeded + '</strong> / 预算 <strong>' + budget + '</strong><br>' +
+        '<span style=\"color:#ff6b6b;font-weight:700;\">超出 ' + diff + ' 点</span> — 请降低目标或增加模组数量' +
+        '</div>';
     } else if (diff < 0) {
-      html = `<div style="padding:8px 14px;border-radius:8px;background:rgba(244,181,61,0.1);border:1px solid rgba(244,181,61,0.3);font-size:13px;">
-        🟡 目标总和 <strong>${targetSum}</strong>，预算 <strong>${budget}</strong><br>
-        <span style="color:#f4b53d;font-weight:700;">低于 ${-diff} 点</span> — 还有点数没用完。
-        建议将目标总和调整为 <strong>${budget}</strong>（当前差${-diff}点），这样更容易得到精确解
-      </div>`;
+      html = '<div style=\"padding:8px 14px;border-radius:8px;background:rgba(244,181,61,0.1);border:1px solid rgba(244,181,61,0.3);font-size:13px;\">' +
+        '🟡 护甲需提供 <strong>' + armorNeeded + '</strong> / 预算 <strong>' + budget + '</strong><br>' +
+        '<span style=\"color:#f4b53d;font-weight:700;\">低于 ' + (-diff) + ' 点</span> — 还有点数没用完' +
+        '</div>';
     } else {
-      html = `<div style="padding:8px 14px;border-radius:8px;background:rgba(74,217,139,0.1);border:1px solid rgba(74,217,139,0.3);font-size:13px;">
-        🟢 目标总和 <strong>${targetSum}</strong> = 预算 <strong>${budget}</strong>，刚好
-      </div>`;
+      html = '<div style=\"padding:8px 14px;border-radius:8px;background:rgba(74,217,139,0.1);border:1px solid rgba(74,217,139,0.3);font-size:13px;\">' +
+        '🟢 护甲需提供 <strong>' + armorNeeded + '</strong> = 预算 <strong>' + budget + '</strong>，刚好' +
+        '</div>';
     }
     sumEl.innerHTML = html;
     sumEl.style.cssText = 'display:block;';
@@ -872,9 +877,9 @@ function solve() {
     let raw = targets[s] - (fragments[s] || 0);
     if (targets[s] === 0 || raw < 0) raw = 0; // Game floors at 0
 
-    // Check against achievable minimum
+    // Check against achievable minimum (final = armor + fragment, armor can't go below armorMinPerStat)
     const finalMin = Math.max(0, armorMinPerStat + (fragments[s] || 0));
-    if (raw < finalMin) {
+    if (targets[s] < finalMin) {
       minViolations.push({ stat: s, target: targets[s], min: finalMin });
       adjTarget[s] = finalMin;
     } else {
@@ -1056,8 +1061,9 @@ function refineWithPriorities() {
     if (lastTargets[s] === 0 || raw < 0) raw = 0;
     const finalMin = Math.max(0, armorMinPerStat + (lastFragments[s] || 0));
     // force0 constraint: override target to minimum possible
-    if (constraints.force0[s]) raw = finalMin;
-    adjTarget[s] = raw < finalMin ? finalMin : raw;
+    if (constraints.force0[s]) adjTarget[s] = finalMin;
+    else if (lastTargets[s] < finalMin) adjTarget[s] = finalMin;
+    else adjTarget[s] = raw;
   }
 
   // Show loading
