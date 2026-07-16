@@ -154,7 +154,14 @@
     .header h1 { font-size: 18px; }
     .header .subtitle { font-size: 11px; }
     #solutionNav button { font-size: 11px; padding: 6px 10px; }
+    #solutionNav div[style*=\"grid\"] { grid-template-columns: 1fr !important; }
     .btn-row { margin-bottom: 12px; }
+    #floatJump { bottom: 12px; right: 12px; gap: 6px; }
+    #floatJump button { width: 38px; height: 38px; font-size: 18px; }
+    #solutionNav .btn, #compCard .btn { font-size: 11px; padding: 4px 8px; }
+  }
+  @media (max-width: 768px) {
+    #floatJump { bottom: 16px; right: 16px; }
   }
 </style>
 </head>
@@ -176,17 +183,18 @@
     <details>
       <summary style="cursor:pointer;font-weight:700;font-size:15px;color:var(--accent);">程序介绍（点击展开）</summary>
       <div style="margin-top:12px;font-size:14px;color:var(--text-dim);line-height:1.8;">
-	        <p>本程序用于命运2最终版本的T5护甲配装求解。输入总目标六维属性，算出5件装备分别对应的属性值</p>
+	        <p>本程序用于命运2最终版本的T5护甲配装求解。输入总目标六维属性，算出5件装备分别对应的属性值，以及根据你已有装备算出还需要刷什么装备</p>
 	        <p>使用方法：<br>
 	        输入目标六维数值、模组数量、碎片属性，点求解，程序给出方案，每件装备用什么机灵模组、第三属性要什么、调谐怎么调、模组插哪个属性<br>
 	        碎片调整以10为单位，可选调谐+3模式，选择几件装备用免费+3模组，其余则是+5/-5<br>
 	        填完数值自动显示每个属性能压到多低，以及第二低属性至少需要多少，不合要求会提示<br>
 	        填目标属性的时候实时显示总和多少，以及与理论总和的差值<br>
-	        求解后多种方案自动排序，最容易刷取的排前面（4+1好过3+2好过2+2+1）<br>
-	        如果能精确达成则不显示有偏差的配装，如果没有能精确达成的，配装显示顺序按照属性符合程度排序<br>
+		        枚举全部原型组合保证找出所有精确解，没有精确解时显示前60种按符合程度排序<br>
+		        配装方案分为"机灵模组需求"和"灵活分配"两部分，第三属性、调谐槽、护甲模组不绑定具体装备<br>
+		        已有毕业装备可输入件数、第三属性、调谐槽，自动判断每件装备是否正确匹配、属性不匹配还是还需刷取，三种状态一目了然<br>
 	        勾选你已经有的装备的机灵模组类型，方案按照剩余装备刷取难易程度排序<br>
 	        配装不够精确时可以勾"精确达成""不超过100""强制最低"<br>
-	        求解完可以保存，配装存浏览器里，下次打开页面在底部点一下就能加载回来，最多30套，想要删除直接点删除就行</p>
+	        求解完可以保存，配装存浏览器里，下次打开页面在底部点一下就能加载回来，最多255套，想要删除直接点删除就行</p>
 	        <p>基础参数：<br>
 	        每件T5：主属性30 + 副属性25 + 第三属性20 + 3个大师杰作各5 = 90点，5件共450点<br>
 	        调谐槽二选一：+5/-5（净变化0）或 +3<br>
@@ -240,6 +248,12 @@
     <button class="btn" onclick="saveBuild()" style="margin-left:8px;">💾 保存当前配装</button>
   </div>
 
+  <!-- Floating jump button -->
+  <div id="floatJump" style="display:none;position:fixed;bottom:20px;right:20px;z-index:99;flex-direction:column;gap:8px;">
+    <button onclick="document.getElementById('solutionNav').scrollIntoView({behavior:'smooth'})" style="width:44px;height:44px;border-radius:50%;border:2px solid var(--accent);background:var(--card);color:var(--accent);cursor:pointer;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,0.3);" title="返回方案列表">⬆</button>
+    <button onclick="document.getElementById('compCard').scrollIntoView({behavior:'smooth'})" style="width:44px;height:44px;border-radius:50%;border:2px solid var(--accent);background:var(--card);color:var(--accent);cursor:pointer;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,0.3);" title="跳转到配装详情">⬇</button>
+  </div>
+
   <div id="messages"></div>
 
   <div class="card" id="savedCard" style="display:none;">
@@ -254,8 +268,8 @@
 
   <div class="results" id="results">
     <div class="card" id="solutionNav" style="display:none;padding:12px 24px;margin-bottom:0;border-bottom:none;border-radius:12px 12px 0 0;"></div>
-    <div class="card" style="border-radius:0 0 12px 12px;">
-      <h2>目标 vs 实际</h2>
+    <div class="card" id="compCard" style="border-radius:0 0 12px 12px;">
+      <h2>目标 vs 实际 <button class="btn" onclick="document.getElementById('solutionNav').scrollIntoView({behavior:'smooth'})" style="font-size:11px;padding:2px 8px;float:right;">⬆ 返回方案列表</button></h2>
       <div class="comparison" id="comparisonGrid"></div>
       <div style="text-align:center;margin-top:12px;font-size:13px;color:var(--text-dim);" id="scoreDisplay"></div>
       <div id="ownedGearSection" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:none;"></div>
@@ -274,7 +288,7 @@
       <div id="refineCost" style="margin-top:14px;font-size:13px;"></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="piecesCard">
       <h2>推荐配装方案</h2>
       <div id="piecesOutput"></div>
     </div>
@@ -468,7 +482,12 @@ function evaluateConfig(baseConfigs, target, numPlus5, numPlus10, numPlus3, cons
         const oldPen = singlePenalty(totals[st], target[st], p[st], l100[st], f0[st]);
         const newPen = singlePenalty(totals[st] + modSize, target[st], p[st], l100[st], f0[st]);
         const imp = oldPen - newPen;
-        if (imp > bestImprovement) {
+        // Tiebreaker: same improvement → prefer stat further below target; if still tied → higher target
+        const thisGap = totals[st] - target[st];
+        const bestGap = bestStat ? totals[bestStat] - target[bestStat] : 0;
+        if (imp > bestImprovement ||
+            (Math.abs(imp - bestImprovement) < 0.001 && (thisGap < bestGap ||
+             (Math.abs(thisGap - bestGap) < 0.001 && target[st] > (target[bestStat]||0))))) {
           for (let pp = 0; pp < 5; pp++) {
             if (!usedPieces.has(pp)) { bestImprovement = imp; bestStat = st; bestPiece = pp; break; }
           }
@@ -489,6 +508,82 @@ function evaluateConfig(baseConfigs, target, numPlus5, numPlus10, numPlus3, cons
       bestScore = finalScore;
       bestOverall = { totals: { ...totals }, tuningAssignments: [...tuningAssignments], modAssignments: { ...modAssignments }, score: finalScore };
       if (bestScore === 0) break;
+    }
+  }
+
+  // Refinement: try swapping each +5/-5 piece's +5 target to improve score
+  const p = constraints?.priorities || {};
+  const l100 = constraints?.le100 || {};
+  const f0 = constraints?.force0 || {};
+  // Only refine near-miss configs (score < 500) to save time
+  // Only refine reasonably close configs to save time
+  if (bestOverall && bestOverall.score > 0 && bestOverall.score < 10000) {
+    let improved = true;
+    while (improved) {
+      improved = false;
+      for (let i = 0; i < 5; i++) {
+        if (bestOverall.tuningAssignments[i].mode !== '+5-5') continue;
+        const curFrom = bestOverall.tuningAssignments[i].from;
+        const curTo = bestOverall.tuningAssignments[i].to;
+        for (const altTo of STATS) {
+          if (altTo === curTo || altTo === curFrom) continue;
+          // Build trial totals
+          const trialTotals = { ...baseTotals };
+          // Apply +3 pieces
+          for (let j = 0; j < 5; j++) {
+            if (bestOverall.tuningAssignments[j].mode === '+3') {
+              for (const s of mwStats[j]) trialTotals[s] += 1;
+            }
+          }
+          // Apply all tuning with the swap
+          for (let j = 0; j < 5; j++) {
+            const t = bestOverall.tuningAssignments[j];
+            if (t.mode !== '+5-5') continue;
+            if (j === i) {
+              trialTotals[curFrom] -= 5;
+              trialTotals[altTo] += 5;
+            } else {
+              trialTotals[t.from] -= 5;
+              trialTotals[t.to] += 5;
+            }
+          }
+          // Redo mod distribution
+          const modSizes2 = [];
+          for (let k = 0; k < numPlus10; k++) modSizes2.push(10);
+          for (let k = 0; k < numPlus5; k++) modSizes2.push(5);
+          modSizes2.sort((a2, b2) => b2 - a2);
+          const trialMods = {};
+          const used2 = new Set();
+          for (const ms of modSizes2) {
+            let bStat = null, bPiece = null, bImp = -Infinity;
+            for (const st2 of STATS) {
+              const op = singlePenalty(trialTotals[st2], target[st2], p[st2], l100[st2], f0[st2]);
+              const np = singlePenalty(trialTotals[st2] + ms, target[st2], p[st2], l100[st2], f0[st2]);
+              const im = op - np;
+              if (im > bImp) {
+                for (let pp2 = 0; pp2 < 5; pp2++) {
+                  if (!used2.has(pp2)) { bImp = im; bStat = st2; bPiece = pp2; break; }
+                }
+              }
+            }
+            if (bPiece !== null) { trialMods[bPiece] = { stat: bStat, size: ms }; used2.add(bPiece); trialTotals[bStat] += ms; }
+          }
+          for (let pp2 = 0; pp2 < 5; pp2++) { if (!trialMods[pp2]) trialMods[pp2] = null; }
+          const trialScore = scoreStats(trialTotals, target, constraints);
+          if (trialScore < bestScore) {
+            bestScore = trialScore;
+            bestOverall = {
+              totals: { ...trialTotals },
+              tuningAssignments: bestOverall.tuningAssignments.map((t2, j) => j === i ? { mode: '+5-5', from: curFrom, to: altTo } : { ...t2 }),
+              modAssignments: { ...trialMods },
+              score: trialScore,
+            };
+            improved = true;
+            if (trialScore === 0) break;
+          }
+        }
+        if (improved) break;
+      }
     }
   }
 
@@ -567,83 +662,94 @@ function farmabilityScore(config) {
 // ============================================================
 
 function runSolver(target, numPlus5, numPlus10, numPlus3, constraints) {
-  // Collect unique solutions: key -> {config, result}
   const solutionMap = new Map();
 
-  const NUM_RESTARTS = 400; // Increased to find more unique solutions
+  // Enumerate all archetype multisets (C(16,5) = 4368 combinations with repetition)
+  for (let a0 = 0; a0 < 12; a0++) {
+   for (let a1 = a0; a1 < 12; a1++) {
+    for (let a2 = a1; a2 < 12; a2++) {
+     for (let a3 = a2; a3 < 12; a3++) {
+      for (let a4 = a3; a4 < 12; a4++) {
+        const archIndices = [a0, a1, a2, a3, a4];
 
-  for (let restart = 0; restart < NUM_RESTARTS; restart++) {
-    let config = [];
-    for (let i = 0; i < 5; i++) {
-      config.push(BASE_CONFIGS[Math.floor(Math.random() * BASE_CONFIGS.length)]);
-    }
+        // Greedy tertiary assignment
+        const config = [];
+        const partialTotals = {};
+        for (const s of STATS) partialTotals[s] = 0;
 
-    let result = evaluateConfig(config, target, numPlus5, numPlus10, numPlus3, constraints);
-    let currentScore = result.score;
+        for (let i = 0; i < 5; i++) {
+          const archIdx = archIndices[i];
+          let bestPiece = null, bestAfterScore = Infinity;
+          for (let t = 0; t < 4; t++) {
+            const piece = BASE_CONFIGS[archIdx * 4 + t];
+            const hypo = { ...partialTotals };
+            for (const s of STATS) hypo[s] += piece.baseStats[s];
+            const ratio = (i + 1) / 5;
+            let s = 0;
+            for (const st of STATS) {
+              const expected = target[st] * ratio;
+              const diff = hypo[st] - expected;
+              s += diff < 0 ? diff * diff * 3 : diff * diff;
+            }
+            if (s < bestAfterScore) { bestAfterScore = s; bestPiece = piece; }
+          }
+          config.push(bestPiece);
+          for (const s of STATS) partialTotals[s] += bestPiece.baseStats[s];
+        }
 
-    // Hill climbing
-    let improved = true;
-    let iter = 0;
-    const MAX_ITER = 30;
-
-    while (improved && iter < MAX_ITER) {
-      improved = false;
-      iter++;
-
-      for (let pos = 0; pos < 5; pos++) {
-        let foundBetter = false;
-        const order = shuffle([...Array(BASE_CONFIGS.length).keys()]);
-
-        for (const altIdx of order) {
-          if (BASE_CONFIGS[altIdx] === config[pos]) continue;
-          const newConfig = [...config];
-          newConfig[pos] = BASE_CONFIGS[altIdx];
-          const newResult = evaluateConfig(newConfig, target, numPlus5, numPlus10, numPlus3, constraints);
-
-          if (newResult.score < currentScore) {
-            config = newConfig;
-            currentScore = newResult.score;
-            result = newResult;
-            improved = true;
-            foundBetter = true;
-            break;
+        // Quick local search over tertiary choices (try swapping one piece's tertiary)
+        let bestConfig = [...config];
+        let bestResult = evaluateConfig(bestConfig, target, numPlus5, numPlus10, numPlus3, constraints);
+        let improved = true;
+        while (improved) {
+          improved = false;
+          for (let i = 0; i < 5; i++) {
+            const archIdx = archIndices[i];
+            for (let t = 0; t < 4; t++) {
+              const alt = BASE_CONFIGS[archIdx * 4 + t];
+              if (alt === bestConfig[i]) continue;
+              const trial = [...bestConfig];
+              trial[i] = alt;
+              const r = evaluateConfig(trial, target, numPlus5, numPlus10, numPlus3, constraints);
+              if (r.score < bestResult.score) {
+                bestConfig = trial; bestResult = r; improved = true; break;
+              }
+            }
+            if (improved) break;
           }
         }
 
-        if (foundBetter) break;
+        // Dedup and store
+        const key = archetypeKey(bestConfig);
+        const existing = solutionMap.get(key);
+        if (!existing || bestResult.score < existing.score) {
+          solutionMap.set(key, {
+            config: [...bestConfig],
+            tuningAssignments: bestResult.tuningAssignments,
+            modAssignments: bestResult.modAssignments,
+            totals: bestResult.totals,
+            score: bestResult.score,
+          });
+          if (bestResult.score === 0) { /* keep searching for all perfect solutions */ }
+        }
       }
+     }
     }
-
-    // Store this converged solution (dedup by archetype multiset)
-    const key = archetypeKey(config);
-    const existing = solutionMap.get(key);
-    if (!existing || currentScore < existing.score) {
-      solutionMap.set(key, {
-        config: [...config],
-        tuningAssignments: result.tuningAssignments,
-        modAssignments: result.modAssignments,
-        totals: result.totals,
-        score: currentScore,
-      });
-    }
+   }
   }
 
-  // Sort solutions: first by score tier, then by farmability within same tier
   const solutions = [...solutionMap.values()];
   solutions.sort((a, b) => {
-    const aTier = Math.floor(a.score / 100);
-    const bTier = Math.floor(b.score / 100);
-    if (aTier !== bTier) return a.score - b.score;
-
-    const aFarm = farmabilityScore(a.config);
-    const bFarm = farmabilityScore(b.config);
-    if (aFarm !== bFarm) return aFarm - bFarm;
-
+    if (Math.floor(a.score/100) !== Math.floor(b.score/100)) return a.score - b.score;
+    const aF = farmabilityScore(a.config), bF = farmabilityScore(b.config);
+    if (aF !== bF) return aF - bF;
     return a.score - b.score;
   });
 
-  // Cap to top 20 solutions to keep UI manageable
-  return solutions.slice(0, 20);
+  // Show all perfect solutions, or top 20 imperfect ones
+  const perfectOnes = solutions.filter(s => s.score === 0);
+  if (perfectOnes.length > 0) return perfectOnes;
+  return solutions.slice(0, 60);
 }
 
 function shuffle(arr) {
@@ -837,8 +943,10 @@ function solve() {
   const results = document.getElementById('results');
   const loading = document.getElementById('loading');
   msgs.innerHTML = '';
+  ownedGearState = {};
   results.classList.remove('show');
   document.getElementById('refineCard').style.display = 'none';
+  document.getElementById('floatJump').style.display = 'none';
 
   const targets = {};
   for (const s of STATS) targets[s] = getVal('target_' + s);
@@ -1125,41 +1233,161 @@ function displayPieceResults(result, fragments) {
   const piecesOutput = document.getElementById('piecesOutput');
   let piecesHTML = '';
 
+  // === Section 1: Archetype requirements (per piece matters) ===
+  piecesHTML += '<h3 style="color:var(--text);margin-bottom:8px;">机灵模组需求（需按件刷取）</h3>';
+  const archCount = {};
   for (let i = 0; i < 5; i++) {
-    const p = result.config[i];
-    const tune = result.tuningAssignments[i];
-    const ma = result.modAssignments[i];
-
-    const pieceStats = { ...p.baseStats };
-    if (tune.mode === '+3') {
-      const mwSet = new Set([p.primary, p.secondary, p.tertiary]);
-      for (const s of STATS) { if (!mwSet.has(s)) pieceStats[s] += 1; }
-    } else {
-      pieceStats[tune.from] -= 5;
-      pieceStats[tune.to] += 5;
-    }
-    if (ma) pieceStats[ma.stat] += ma.size;
-
-    piecesHTML += `
-    <div class="piece-result">
-      <div class="piece-name">
-        <span class="emoji">${PIECE_EMOJI[i]}</span> ${PIECE_NAMES[i]}
-      </div>
-      <div class="detail-grid">
-        <div><span class="detail-label">机灵模组:</span> <span class="detail-value" style="color:#d4956b">${p.archetype}</span></div>
-        <div><span class="detail-label">主属性(30):</span> <span class="detail-value" style="color:${STAT_COLORS[p.primary]}">${STAT_LABELS[p.primary]}</span></div>
-        <div><span class="detail-label">副属性(25):</span> <span class="detail-value" style="color:${STAT_COLORS[p.secondary]}">${STAT_LABELS[p.secondary]}</span></div>
-        <div><span class="detail-label">第三属性(20):</span> <span class="detail-value" style="color:${STAT_COLORS[p.tertiary]}">${STAT_LABELS[p.tertiary]}</span></div>
-        ${tune.mode === '+3' ? `<div><span class="detail-label">调谐模式:</span> <span class="detail-value" style="color:var(--accent);">+3 (三个5属性各+1)</span></div>` : `
-        <div><span class="detail-label">调谐 -5:</span> <span class="detail-value" style="color:${STAT_COLORS[tune.from]}">${STAT_LABELS[tune.from]}</span></div>
-        <div><span class="detail-label">调谐 +5:</span> <span class="detail-value" style="color:${STAT_COLORS[tune.to]}">${STAT_LABELS[tune.to]}</span></div>`}
-        ${ma ? `<div><span class="detail-label">护甲模组:</span> <span class="detail-value" style="color:${STAT_COLORS[ma.stat]}">+${ma.size} ${STAT_LABELS[ma.stat]}</span></div>` : '<div><span class="detail-label">护甲模组:</span> <span class="detail-value" style="color:var(--text-dim)">无</span></div>'}
-      </div>
-      <div class="piece-stats-row">
-        ${STATS.map(s => `<span style="color:${STAT_COLORS[s]}">${STAT_LABELS[s]}: ${pieceStats[s]}</span>`).join('')}
-      </div>
-    </div>`;
+    const name = result.config[i].archetype;
+    archCount[name] = (archCount[name] || 0) + 1;
   }
+  piecesHTML += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">';
+  for (const [name, count] of Object.entries(archCount)) {
+    piecesHTML += '<div style="padding:6px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:13px;">' +
+      '<span style="color:#d4956b;font-weight:600;">' + name + '</span> ×<strong>' + count + '</strong> 件</div>';
+  }
+  piecesHTML += '</div>';
+
+  // === Section 2: Flexible assignments (can be on any piece) ===
+  piecesHTML += '<h3 style="color:var(--text);margin-bottom:8px;">灵活分配（不绑定具体装备）</h3>';
+  piecesHTML += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;font-size:13px;">';
+
+  // Tertiary stats
+  piecesHTML += '<div style="padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);">' +
+    '<div style="font-weight:600;margin-bottom:4px;">第三属性(20)</div>';
+  const tertCount = {};
+  for (let i = 0; i < 5; i++) {
+    const t = result.config[i].tertiary;
+    tertCount[t] = (tertCount[t] || 0) + 1;
+  }
+  for (const [s, c] of Object.entries(tertCount)) {
+    piecesHTML += '<div style="color:' + STAT_COLORS[s] + ';">' + STAT_LABELS[s] + ' ×' + c + '</div>';
+  }
+  piecesHTML += '</div>';
+
+  // Tuning
+  piecesHTML += '<div style="padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);">' +
+    '<div style="font-weight:600;margin-bottom:4px;">调谐槽</div>';
+  const tuneFromCount = {}, tuneToCount = {}, plus3Count = result.tuningAssignments.filter(t => t.mode === '+3').length;
+  for (let i = 0; i < 5; i++) {
+    const t = result.tuningAssignments[i];
+    if (t.mode === '+3') continue;
+    tuneFromCount[t.from] = (tuneFromCount[t.from] || 0) + 1;
+    tuneToCount[t.to] = (tuneToCount[t.to] || 0) + 1;
+  }
+  if (plus3Count > 0) {
+    piecesHTML += '<div style="color:var(--accent);">+3模式 ×' + plus3Count + '</div>';
+  }
+  for (const [s, c] of Object.entries(tuneFromCount)) {
+    piecesHTML += '<div style="color:' + STAT_COLORS[s] + ';">-5 ' + STAT_LABELS[s] + ' ×' + c + '</div>';
+  }
+  for (const [s, c] of Object.entries(tuneToCount)) {
+    piecesHTML += '<div style="color:' + STAT_COLORS[s] + ';">+5 ' + STAT_LABELS[s] + ' ×' + c + '</div>';
+  }
+  piecesHTML += '</div>';
+
+  // Mods
+  piecesHTML += '<div style="padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);">' +
+    '<div style="font-weight:600;margin-bottom:4px;">护甲模组</div>';
+  const modCount = {};
+  for (let i = 0; i < 5; i++) {
+    const ma = result.modAssignments[i];
+    if (!ma) continue;
+    const key = ma.stat + '|' + ma.size;
+    modCount[key] = (modCount[key] || 0) + 1;
+  }
+  for (const [key, c] of Object.entries(modCount)) {
+    const [stat, size] = key.split('|');
+    piecesHTML += '<div style="color:' + STAT_COLORS[stat] + ';">+' + size + ' ' + STAT_LABELS[stat] + ' ×' + c + '</div>';
+  }
+  if (Object.keys(modCount).length === 0) piecesHTML += '<div style="color:var(--text-dim);">无</div>';
+  piecesHTML += '</div>';
+
+  piecesHTML += '</div>';
+
+  // === Section 3: What still needs farming (dynamic based on owned gear) ===
+  let needFarm = false;
+  const farmLines = [], mismatchLines = [], correctLines = [];
+  for (const [name, needed] of Object.entries(archCount)) {
+    const st = ownedGearState[name] || { count: 0, pieces: [] };
+    const owned = Math.min(st.count || 0, needed);
+    const remaining = Math.max(0, needed - owned);
+
+    // Collect all tertiary+tuning pairs (order-independent matching)
+    const needPairs = [];
+    for (let i = 0; i < 5; i++) {
+      if (result.config[i].archetype === name) {
+        const tune = result.tuningAssignments[i];
+        needPairs.push({
+          tert: result.config[i].tertiary,
+          tune: tune.mode === '+5-5' ? tune.to : (tune.mode === '+3' ? '+3' : null)
+        });
+      }
+    }
+
+    // Stage 1: Match by tertiary (tuning is freely assignable)
+    const unmatchedTerts = needPairs.map(p => p.tert);
+    const unmatchedTunes = needPairs.map(p => p.tune);
+    for (let p = 0; p < owned; p++) {
+      const piece = st.pieces[p] || {};
+      let matchIdx = -1;
+      // Match by tertiary only
+      for (let n = 0; n < unmatchedTerts.length; n++) {
+        if (!piece.tertiary || piece.tertiary === unmatchedTerts[n]) { matchIdx = n; break; }
+      }
+      if (matchIdx >= 0) {
+        const reqTert = unmatchedTerts[matchIdx];
+        const reqTune = unmatchedTunes[matchIdx];
+        let desc = '第三属性' + STAT_LABELS[reqTert];
+        // Check tuning
+        if (piece.tuneTo && reqTune && reqTune !== '+3' && piece.tuneTo !== reqTune) {
+          desc += '，⚠️ 调谐+5你选的' + STAT_LABELS[piece.tuneTo] + '，方案需' + STAT_LABELS[reqTune];
+          mismatchLines.push('⚠️ ' + name + '第' + (p+1) + '件：' + desc);
+        } else if (reqTune === '+3') {
+          desc += '，调谐+3';
+          correctLines.push('✅ ' + name + '第' + (p+1) + '件：' + desc);
+        } else if (reqTune) {
+          desc += '，调谐+5' + STAT_LABELS[reqTune];
+          correctLines.push('✅ ' + name + '第' + (p+1) + '件：' + desc);
+        } else {
+          correctLines.push('✅ ' + name + '第' + (p+1) + '件：' + desc);
+        }
+        unmatchedTerts.splice(matchIdx, 1);
+        unmatchedTunes.splice(matchIdx, 1);
+      } else {
+        const parts = [];
+        if (!piece.tertiary) {
+          parts.push('第三属性需' + [...new Set(unmatchedTerts)].map(t => STAT_LABELS[t]).join('或'));
+        } else {
+          parts.push('第三属性你选的' + STAT_LABELS[piece.tertiary] + '，需要选' + [...new Set(unmatchedTerts)].map(t => STAT_LABELS[t]).join('或'));
+        }
+        const topts = [...new Set(unmatchedTunes.filter(t => t && t !== '+3'))];
+        if (topts.length > 0) {
+          parts.push('调谐+5需' + topts.map(t => STAT_LABELS[t]).join('或'));
+        }
+        if (parts.length > 0) mismatchLines.push('⚠️ ' + name + '第' + (p+1) + '件：' + parts.join('，'));
+      }
+    }
+    // Remaining unmatched = still to farm
+    for (let i = 0; i < unmatchedTerts.length; i++) {
+      let line = '第三属性' + STAT_LABELS[unmatchedTerts[i]];
+      if (unmatchedTunes[i] && unmatchedTunes[i] !== '+3') line += '，调谐+5' + STAT_LABELS[unmatchedTunes[i]];
+      farmLines.push('<div style="margin-bottom:4px;">💡 ' + name + '还需1件：' + line + '</div>');
+    }
+  }
+
+  if (correctLines.length > 0) {
+    piecesHTML += '<div style="margin-top:14px;padding:10px 14px;border-radius:8px;background:rgba(74,217,139,0.08);border:2px solid rgba(74,217,139,0.3);font-size:13px;line-height:1.8;">' +
+      '<div style="font-weight:700;font-size:14px;color:#4ad98b;margin-bottom:4px;">已正确匹配</div>' + correctLines.join('<br>') + '</div>';
+  }
+  if (mismatchLines.length > 0) {
+    piecesHTML += '<div style="margin-top:14px;padding:10px 14px;border-radius:8px;background:rgba(255,107,107,0.1);border:2px solid rgba(255,107,107,0.4);font-size:13px;line-height:1.8;">' +
+      '<div style="font-weight:700;font-size:14px;color:#ff8888;margin-bottom:4px;">已有装备不匹配</div>' + mismatchLines.join('<br>') + '</div>';
+  }
+  if (farmLines.length > 0) {
+    piecesHTML += '<div style="margin-top:14px;padding:12px 16px;border-radius:8px;background:rgba(244,181,61,0.1);border:2px solid rgba(244,181,61,0.35);font-size:13px;line-height:2;">' +
+      '<div style="font-weight:700;font-size:14px;color:#ffd866;margin-bottom:6px;">还需刷取</div>' + farmLines.join('<br>') + '</div>';
+  }
+
   piecesOutput.innerHTML = piecesHTML;
 
   // Show exotic recommendation
@@ -1172,6 +1400,7 @@ function displayPieceResults(result, fragments) {
 function displayAllResults(result, targets, fragments) {
   const results = document.getElementById('results');
   results.classList.add('show');
+  document.getElementById('floatJump').style.display = 'flex';
   const finalTotals = { ...result.totals };
   for (const s of STATS) finalTotals[s] += (fragments[s] || 0);
 
@@ -1250,7 +1479,8 @@ function renderSolutionNav() {
     ? `✅ 共 ${showSolutions.length} 种精确达成方案，按易刷程度排序（已隐藏不完美的方案）`
     : `⚠️ 无精确方案，${showSolutions.length} 种近似方案，按符合程度排序（越靠前越接近目标）`;
 
-  let navHTML = `<div style="font-size:14px;color:var(--text-dim);margin-bottom:10px;">${title}</div>`;
+  let navHTML = `<div style="font-size:14px;color:var(--text-dim);margin-bottom:6px;">${title}</div>`;
+  navHTML += '<div style="margin-bottom:8px;"><button class="btn" onclick="document.getElementById(\'compCard\').scrollIntoView({behavior:\'smooth\'})" style="font-size:11px;padding:4px 10px;">⬇ 跳过方案列表</button></div>';
   navHTML += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
   for (let si = 0; si < showSolutions.length; si++) {
     const sol = showSolutions[si];
@@ -1288,42 +1518,137 @@ function switchSolution(realIdx) {
   displayAllResults(allSolutions[realIdx], lastTargets, lastFragments);
 }
 
+// Global owned gear state (persists across solution switches)
+let ownedGearState = {}; // { 'archetypeName': { count: N, pieces: [{tertiary: 'stat', tuneTo: 'stat'}, ...] } }
+
 function buildOwnedGearSection(finalTotals, targets) {
   const section = document.getElementById('ownedGearSection');
+  // Get all archetypes across ALL solutions
   const allArchs = new Set();
+  const archMax = {}; // max needed across all solutions
   for (const sol of allSolutions) {
-    for (let i = 0; i < 5; i++) { allArchs.add(sol.config[i].archetype); }
+    const cnt = {};
+    for (let i = 0; i < 5; i++) {
+      const name = sol.config[i].archetype;
+      allArchs.add(name);
+      cnt[name] = (cnt[name] || 0) + 1;
+    }
+    for (const [n, c] of Object.entries(cnt)) {
+      archMax[n] = Math.max(archMax[n] || 0, c);
+    }
   }
   if (allArchs.size <= 1) { section.style.display = 'none'; return; }
-  const archNames = [...allArchs].sort();
-  let html2 = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">勾选你<strong>已有毕业装备</strong>的机灵模组：</div>';
-  html2 += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
-  archNames.forEach((name, idx) => {
-    html2 += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:12px;padding:3px 8px;border-radius:4px;border:1px solid var(--border);background:rgba(255,255,255,0.02);"><input type="checkbox" id="ownedArch_' + idx + '" style="accent-color:var(--accent);"><span style="font-weight:600;">' + name + '</span></label>';
-  });
-  html2 += '<button class="btn" onclick="resortByOwned()" style="font-size:12px;padding:4px 12px;">按需刷数量重新排序</button></div>';
+
+  let html2 = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;">已有毕业装备（会记住你填的内容，切换方案不丢失）：</div>';
+
+  for (const name of [...allArchs].sort()) {
+    const needed = archMax[name] || 1;
+    // Init state if needed
+    if (!ownedGearState[name]) ownedGearState[name] = { count: 0, pieces: [] };
+    const st = ownedGearState[name];
+
+    html2 += '<div style="margin-bottom:8px;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);">';
+    html2 += '<span style="color:#d4956b;font-weight:600;">' + name + '</span> 最多需要<strong>' + needed + '</strong>件，已有 <input type="number" id="ownedCnt_' + name.replace(/[^a-zA-Z一-鿿]/g,'_') + '" value="' + st.count + '" min="0" max="' + needed + '" onchange="updateOwnedCount(\'' + name + '\',this.value)" style="width:40px;padding:2px 4px;border-radius:4px;border:1px solid var(--border);background:var(--bg);color:#fff;font-size:12px;text-align:center;"> 件';
+
+    // Show owned piece details if count > 0
+    if (st.count > 0) {
+      html2 += '<div style="margin-top:4px;margin-left:8px;font-size:11px;color:var(--text-dim);">';
+      for (let p = 0; p < Math.min(st.count, needed); p++) {
+        if (!st.pieces[p]) st.pieces[p] = { tertiary: '', tuneTo: '' };
+        html2 += '第' + (p+1) + '件: 第三属性 <select id="ownedTert_' + name.replace(/[^a-zA-Z一-鿿]/g,'_') + '_' + p + '" onchange="updateOwnedPiece(\'' + name + '\',' + p + ')" style="padding:1px 4px;border-radius:3px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:11px;">';
+        html2 += '<option value="">-</option>';
+        for (const s of STATS) {
+          html2 += '<option value="' + s + '" ' + (st.pieces[p].tertiary === s ? 'selected' : '') + '>' + STAT_LABELS[s] + '</option>';
+        }
+        html2 += '</select>';
+        html2 += ' 调谐+5 <select id="ownedTune_' + name.replace(/[^a-zA-Z一-鿿]/g,'_') + '_' + p + '" onchange="updateOwnedPiece2(\'' + name + '\',' + p + ')" style="padding:1px 4px;border-radius:3px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:11px;">';
+        html2 += '<option value="">-</option>';
+        for (const s of STATS) {
+          html2 += '<option value="' + s + '" ' + (st.pieces[p].tuneTo === s ? 'selected' : '') + '>' + STAT_LABELS[s] + '</option>';
+        }
+        html2 += '</select><br>';
+      }
+      html2 += '</div>';
+    }
+    html2 += '</div>';
+  }
+
+  html2 += '<button class="btn" onclick="resortByOwned()" style="font-size:12px;padding:4px 12px;">按已有装备重新排序</button> ';
+  html2 += '<button class="btn" onclick="clearOwnedGear()" style="font-size:12px;padding:4px 12px;">清空</button>';
   section.innerHTML = html2;
   section.style.display = 'block';
-  section._archNames = archNames;
+}
+
+function updateOwnedCount(name, val) {
+  const n = Math.max(0, Math.min(5, parseInt(val) || 0));
+  if (!ownedGearState[name]) ownedGearState[name] = { count: 0, pieces: [] };
+  ownedGearState[name].count = n;
+  while (ownedGearState[name].pieces.length < n) ownedGearState[name].pieces.push({ tertiary: '', tuneTo: '' });
+  // Rebuild the form to show/hide piece detail dropdowns, but don't refresh the solution
+  buildOwnedGearSection(null, null);
+}
+function updateOwnedPiece(name, idx) {
+  const el = document.getElementById('ownedTert_' + name.replace(/[^a-zA-Z一-鿿]/g,'_') + '_' + idx);
+  if (el && ownedGearState[name] && ownedGearState[name].pieces[idx]) {
+    ownedGearState[name].pieces[idx].tertiary = el.value;
+  }
+}
+function updateOwnedPiece2(name, idx) {
+  const el = document.getElementById('ownedTune_' + name.replace(/[^a-zA-Z一-鿿]/g,'_') + '_' + idx);
+  if (el && ownedGearState[name] && ownedGearState[name].pieces[idx]) {
+    ownedGearState[name].pieces[idx].tuneTo = el.value;
+  }
+}
+function clearOwnedGear() {
+  ownedGearState = {};
+  buildOwnedGearSection(null, null);
 }
 
 function resortByOwned() {
   if (allSolutions.length <= 1) return;
 
-  // Read which archetypes user already owns
-  const section2 = document.getElementById('ownedGearSection');
-  const archNames = section2._archNames || [];
-  const ownedArchetypes = new Set();
-  archNames.forEach((name, idx) => { const cb = document.getElementById('ownedArch_' + idx); if (cb && cb.checked) ownedArchetypes.add(name); });
-  if (ownedArchetypes.size === 0) { alert('请先勾选至少一个已有毕业装备的模组。'); return; }
+  // Build owned count map per archetype
+  const ownedCount = {};
+  let totalOwned = 0;
+  for (const [name, st] of Object.entries(ownedGearState)) {
+    ownedCount[name] = st.count || 0;
+    totalOwned += st.count || 0;
+  }
+  if (totalOwned === 0) { alert('请先输入至少一件已有装备。'); return; }
 
-  // Sort: solutions where more pieces match owned archetypes rank higher
-  // (user needs to farm fewer new pieces)
+  // Count how many owned pieces match a solution (archetype + tertiary + tuning)
+  function countOwnedMatches(sol) {
+    const needs = {};
+    for (let i = 0; i < 5; i++) {
+      const name = sol.config[i].archetype;
+      if (!needs[name]) needs[name] = { terts: [], tunes: [] };
+      const tune = sol.tuningAssignments[i];
+      needs[name].terts.push(sol.config[i].tertiary);
+      needs[name].tunes.push(tune.mode === '+5-5' ? tune.to : (tune.mode === '+3' ? '+3' : null));
+    }
+    let matched = 0;
+    for (const [name, req] of Object.entries(needs)) {
+      const st = ownedGearState[name];
+      if (!st || !st.count) continue;
+      const terts = [...req.terts];
+      const ownedPieces = st.pieces.slice(0, st.count || 0);
+      for (const piece of ownedPieces) {
+        let matchIdx = -1;
+        for (let n = 0; n < terts.length; n++) {
+          if (!piece.tertiary || piece.tertiary === terts[n]) { matchIdx = n; break; }
+        }
+        if (matchIdx >= 0) { matched++; terts.splice(matchIdx, 1); }
+        if (terts.length === 0) break;
+      }
+    }
+    return matched;
+  }
+
+  // Sort: solutions with more owned pieces (including properties) rank higher
   allSolutions.sort((a, b) => {
-    const aOwned = a.config.filter(p => ownedArchetypes.has(p.archetype)).length;
-    const bOwned = b.config.filter(p => ownedArchetypes.has(p.archetype)).length;
-    if (aOwned !== bOwned) return bOwned - aOwned;  // More owned = easier = first
-    // Tie: fewer distinct archetypes
+    const aOwned = countOwnedMatches(a);
+    const bOwned = countOwnedMatches(b);
+    if (aOwned !== bOwned) return bOwned - aOwned;
     return farmabilityScore(a.config) - farmabilityScore(b.config);
   });
 
@@ -1372,7 +1697,7 @@ function saveBuild() {
 
   const builds = getSavedBuilds();
   builds.unshift(build);
-  if (builds.length > 30) builds.length = 30;
+  if (builds.length > 255) builds.length = 255;
   saveBuildsToStorage(builds);
   renderSavedBuilds();
 }
